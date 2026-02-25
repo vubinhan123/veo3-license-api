@@ -29,4 +29,16 @@ def create_license_signature(data: dict):
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
     to_encode = data.copy()
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.JWT_PRIVATE_KEY, algorithm="RS256")
+    private_key = settings.JWT_PRIVATE_KEY
+    if "\\n" in private_key:
+        private_key = private_key.replace("\\n", "\n")
+    if "-----BEGIN RSA PRIVATE KEY-----" in private_key and "\n" not in private_key:
+        private_key = private_key.replace("-----BEGIN RSA PRIVATE KEY----- ", "-----BEGIN RSA PRIVATE KEY-----\n").replace(" -----END RSA PRIVATE KEY-----", "\n-----END RSA PRIVATE KEY-----")
+        # Replace remaining spaces with newlines
+        lines = private_key.split("\n")
+        if len(lines) == 3: # header, body, footer
+            body_with_spaces = lines[1]
+            body_with_newlines = body_with_spaces.replace(" ", "\n")
+            private_key = f"{lines[0]}\n{body_with_newlines}\n{lines[2]}"
+            
+    return jwt.encode(to_encode, private_key, algorithm="RS256")
