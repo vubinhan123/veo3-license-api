@@ -30,26 +30,27 @@ def create_license_signature(data: dict):
     to_encode = data.copy()
     to_encode.update({"exp": expire})
     import base64
-    private_key_str = settings.JWT_PRIVATE_KEY
+    private_key_str = settings.JWT_PRIVATE_KEY.strip()
     
-    # Kiem tra xem key co phai la Base64 khong (khong chua khoang trang, khong chua header PEM)
-    if "BEGIN" not in private_key_str and " " not in private_key_str:
-        try:
-            private_key = base64.b64decode(private_key_str).decode('utf-8')
-        except Exception:
+    # Kiem tra thu decode base64, neu thanh cong va chua PEM header thi dung lai
+    try:
+        decoded = base64.b64decode(private_key_str).decode('utf-8')
+        if "BEGIN PRIVATE KEY" in decoded or "BEGIN RSA PRIVATE KEY" in decoded:
+            private_key = decoded
+        else:
             private_key = private_key_str
-    else:
+    except Exception:
         private_key = private_key_str
         
-        # Van giu logic cu de du phong
+    # Du phong format cu neu khong phai base64
+    if "BEGIN" in private_key:
         if "\\n" in private_key:
             private_key = private_key.replace("\\n", "\n")
         if "-----BEGIN PRIVATE KEY-----" in private_key and "\n" not in private_key:
             private_key = private_key.replace("-----BEGIN PRIVATE KEY----- ", "-----BEGIN PRIVATE KEY-----\n").replace(" -----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
             lines = private_key.split("\n")
             if len(lines) == 3:
-                body_with_spaces = lines[1]
-                body_with_newlines = body_with_spaces.replace(" ", "\n")
-                private_key = f"{lines[0]}\n{body_with_newlines}\n{lines[2]}"
+                body = lines[1].replace(" ", "\n")
+                private_key = f"{lines[0]}\n{body}\n{lines[2]}"
             
     return jwt.encode(to_encode, private_key, algorithm="RS256")
