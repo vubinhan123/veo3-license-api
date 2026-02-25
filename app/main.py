@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core import security
 from app.models.models import User
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
