@@ -32,8 +32,8 @@ def create_license_signature(data: dict):
     private_key = settings.JWT_PRIVATE_KEY
     if "\\n" in private_key:
         private_key = private_key.replace("\\n", "\n")
-    if "-----BEGIN RSA PRIVATE KEY-----" in private_key and "\n" not in private_key:
-        private_key = private_key.replace("-----BEGIN RSA PRIVATE KEY----- ", "-----BEGIN RSA PRIVATE KEY-----\n").replace(" -----END RSA PRIVATE KEY-----", "\n-----END RSA PRIVATE KEY-----")
+    if "-----BEGIN PRIVATE KEY-----" in private_key and "\n" not in private_key:
+        private_key = private_key.replace("-----BEGIN PRIVATE KEY----- ", "-----BEGIN PRIVATE KEY-----\n").replace(" -----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
         # Replace remaining spaces with newlines
         lines = private_key.split("\n")
         if len(lines) == 3: # header, body, footer
