@@ -239,6 +239,11 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         # Đăng ký thiết bị mới
         new_device = Device(license_id=db_license.id, hwid=request.hwid)
         db.add(new_device)
+        
+        # Dong bo HWID sang ban ghi License chinh de Frontend hien thi trang thai Da kich hoat
+        if not db_license.hwid:
+            db_license.hwid = request.hwid
+            
         await db.flush()
     else:
         if current_device.status != "active":
