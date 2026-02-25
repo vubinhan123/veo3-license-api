@@ -1,0 +1,10 @@
+# Backend
+__pycache__/
+*.py[cod]
+*.db
+.env
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
