@@ -13,6 +13,21 @@ from app.schemas import schemas
 
 router = APIRouter()
 
+@router.get("/test-error")
+async def test_error():
+    try:
+        payload = {
+            "license_key": "test",
+            "hwid": "test",
+            "modules": {},
+            "expiry": datetime.now(timezone.utc).isoformat()
+        }
+        token = create_license_signature(payload)
+        return {"status": "ok", "token": token}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.get("/stats")
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     """Tra ve thong ke thuc te cho Dashboard"""
