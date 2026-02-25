@@ -29,16 +29,27 @@ def create_license_signature(data: dict):
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
     to_encode = data.copy()
     to_encode.update({"exp": expire})
-    private_key = settings.JWT_PRIVATE_KEY
-    if "\\n" in private_key:
-        private_key = private_key.replace("\\n", "\n")
-    if "-----BEGIN PRIVATE KEY-----" in private_key and "\n" not in private_key:
-        private_key = private_key.replace("-----BEGIN PRIVATE KEY----- ", "-----BEGIN PRIVATE KEY-----\n").replace(" -----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
-        # Replace remaining spaces with newlines
-        lines = private_key.split("\n")
-        if len(lines) == 3: # header, body, footer
-            body_with_spaces = lines[1]
-            body_with_newlines = body_with_spaces.replace(" ", "\n")
-            private_key = f"{lines[0]}\n{body_with_newlines}\n{lines[2]}"
+    import base64
+    private_key_str = settings.JWT_PRIVATE_KEY
+    
+    # Kiem tra xem key co phai la Base64 khong (khong chua khoang trang, khong chua header PEM)
+    if "BEGIN" not in private_key_str and " " not in private_key_str:
+        try:
+            private_key = base64.b64decode(private_key_str).decode('utf-8')
+        except Exception:
+            private_key = private_key_str
+    else:
+        private_key = private_key_str
+        
+        # Van giu logic cu de du phong
+        if "\\n" in private_key:
+            private_key = private_key.replace("\\n", "\n")
+        if "-----BEGIN PRIVATE KEY-----" in private_key and "\n" not in private_key:
+            private_key = private_key.replace("-----BEGIN PRIVATE KEY----- ", "-----BEGIN PRIVATE KEY-----\n").replace(" -----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----")
+            lines = private_key.split("\n")
+            if len(lines) == 3:
+                body_with_spaces = lines[1]
+                body_with_newlines = body_with_spaces.replace(" ", "\n")
+                private_key = f"{lines[0]}\n{body_with_newlines}\n{lines[2]}"
             
     return jwt.encode(to_encode, private_key, algorithm="RS256")
