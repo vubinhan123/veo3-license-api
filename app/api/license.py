@@ -31,7 +31,7 @@ async def test_error():
 @router.get("/stats")
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     """Tra ve thong ke thuc te cho Dashboard"""
-    now = datetime.utcnow()  # SQLite luu datetime naive, phai dung naive de so sanh
+    now = datetime.now(timezone.utc)
     
     # 1. Dem key theo trang thai
     all_licenses = await db.execute(select(License))
@@ -45,7 +45,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     for l in licenses:
         if l.status == "active" and l.expire_date:
             try:
-                exp = l.expire_date.replace(tzinfo=None) if l.expire_date.tzinfo else l.expire_date
+                exp = l.expire_date if l.expire_date.tzinfo else l.expire_date.replace(tzinfo=timezone.utc)
                 if exp < now + timedelta(days=7):
                     expiring_soon += 1
             except:
@@ -66,7 +66,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         for log in logs:
             if log.created_at:
                 try:
-                    ct = log.created_at.replace(tzinfo=None) if log.created_at.tzinfo else log.created_at
+                    ct = log.created_at if log.created_at.tzinfo else log.created_at.replace(tzinfo=timezone.utc)
                     if ct > now - timedelta(hours=24):
                         logs_24h += 1
                 except:
@@ -105,7 +105,19 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 @router.get("/", response_model=List[schemas.License])
 async def list_licenses(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(License))
-    return result.scalars().all()
+    licenses = result.scalars().all()
+    
+    # He thong tu dong dong bo lai cac Device cu vao bang License
+    for lic in licenses:
+        if not lic.hwid:
+            dev_result = await db.execute(select(Device).where(Device.license_id == lic.id))
+            first_dev = dev_result.scalars().first()
+            if first_dev:
+                lic.hwid = first_dev.hwid
+                db.add(lic)
+    await db.commit()
+    
+    return licenses
 
 @router.get("/logs")
 async def get_logs(db: AsyncSession = Depends(get_db)):
@@ -222,8 +234,8 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
     if db_license.status != "active":
         return VerifyResponse(status="fail", message="License đã bị vô hiệu hóa")
     
-    exp = db_license.expire_date.replace(tzinfo=None) if db_license.expire_date.tzinfo else db_license.expire_date
-    if exp < datetime.utcnow():
+    expire_date = db_license.expire_date if db_license.expire_date.tzinfo else db_license.expire_date.replace(tzinfo=timezone.utc)
+    if expire_date < datetime.now(timezone.utc):
         return VerifyResponse(status="fail", message="License đã hết hạn")
     
     # 3. Kiểm tra thiết bị (HWID Binding)
