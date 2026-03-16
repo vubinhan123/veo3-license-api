@@ -20,12 +20,23 @@ async def login_for_access_token(
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
     
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    if not user:
+        print(f"[!] Login failed: User {form_data.username} not found")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không chính xác",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    if not security.verify_password(form_data.password, user.hashed_password):
+        print(f"[!] Login failed: Incorrect password for {form_data.username}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email hoặc mật khẩu không chính xác",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    print(f"[+] Login success: {form_data.username}")
     
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Tài khoản đã bị vô hiệu hóa")

@@ -169,6 +169,7 @@ async def create_license(data: schemas.LicenseCreate, db: AsyncSession = Depends
         expire_date=data.expire_date,
         max_devices=1,  # Luon la 1 - khoa cung 1 key = 1 may
         status="active",
+        hwid=data.hwid,
         enabled_modules=data.enabled_modules
     )
     db.add(new_license)
