@@ -59,4 +59,8 @@ app.include_router(license.router, prefix=f"{settings.API_V1_STR}/license", tags
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to VEO3 License Management API", "status": "online"}
+    return {
+        "message": "Welcome to VEO3 License Management API",
+        "status": "online",
+        "version": "1.2.62-patch-v3-reset-pwd-verified"
+    }
