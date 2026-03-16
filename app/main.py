@@ -30,6 +30,11 @@ async def lifespan(app: FastAPI):
             )
             session.add(new_admin)
             await session.commit()
+        else:
+            print("[*] Da co Admin, dang cap nhat mat khau moi...")
+            admin.hashed_password = security.get_password_hash("Vubinhan336!@#")
+            session.add(admin)
+            await session.commit()
             
     yield
 
