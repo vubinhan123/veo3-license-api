@@ -32,6 +32,15 @@ def create_license_signature(data: dict):
     import base64
     private_key_str = settings.JWT_PRIVATE_KEY.strip()
     
+    # Loai bo cac dau ngoac kep/don do cac platform nhu Render hay gan vao nguyen ban
+    if private_key_str.startswith('"') and private_key_str.endswith('"'):
+        private_key_str = private_key_str[1:-1]
+    if private_key_str.startswith("'") and private_key_str.endswith("'"):
+        private_key_str = private_key_str[1:-1]
+        
+    # Thay the cac ky tu xuong dong bi ma hoa (\n) thanh new line that su
+    private_key_str = private_key_str.replace('\\n', '\n')
+    
     # Kiem tra thu decode base64, neu thanh cong va chua PEM header thi dung lai
     try:
         decoded = base64.b64decode(private_key_str).decode('utf-8')
