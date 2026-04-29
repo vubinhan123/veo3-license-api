@@ -1,8 +1,3 @@
-databases:
-  - name: veo3-db-v3
-    plan: free
-    databaseName: veo3_licenses
-    user: veo3admin
 
 services:
   - type: web
@@ -13,9 +8,7 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: veo3-db-v3
-          property: connectionString
+        value: postgresql://neondb_owner:npg_VTt2SwnSMl9o@ep-royal-river-amsa2aql.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require
       - key: SECRET_KEY
         generateValue: true
       - key: ALGORITHM
