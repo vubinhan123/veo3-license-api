@@ -14,6 +14,8 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 # asyncpg expects 'ssl' parameter instead of 'sslmode'
 DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
+DATABASE_URL = DATABASE_URL.replace("&channel_binding=require", "")
+DATABASE_URL = DATABASE_URL.replace("?channel_binding=require", "")
 
 # SQLite khong ho tro pool_size va max_overflow
 engine_params = {}
