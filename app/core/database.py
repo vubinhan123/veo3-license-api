@@ -6,15 +6,22 @@ from app.core.config import settings
 # Render.com tra ve URL dang postgres:// nhung SQLAlchemy can postgresql+asyncpg://
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./quanlykey.db")
 
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
 # Fix Render PostgreSQL URL
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# asyncpg does not support sslmode in the URL query string
-DATABASE_URL = DATABASE_URL.replace("?sslmode=require", "")
-DATABASE_URL = DATABASE_URL.replace("&sslmode=require", "")
+# Safely remove sslmode using urllib.parse
+parsed = urlparse(DATABASE_URL)
+if parsed.query:
+    qs = parse_qsl(parsed.query)
+    qs = [ (k, v) for k, v in qs if k != 'sslmode' ]
+    new_query = urlencode(qs)
+    parsed = parsed._replace(query=new_query)
+    DATABASE_URL = urlunparse(parsed)
 
 # SQLite khong ho tro pool_size va max_overflow
 engine_params = {}
