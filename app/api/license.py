@@ -102,6 +102,14 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         "plan_distribution": plan_data,
     }
 
+@router.get("/env")
+async def debug_env():
+    import os, re
+    url = os.getenv("DATABASE_URL", "NOT_FOUND")
+    # Mask password
+    masked = re.sub(r":([^@]+)@", ":***@", url)
+    return {"DATABASE_URL": masked}
+
 @router.get("/fix-db")
 async def fix_db(db: AsyncSession = Depends(get_db)):
     try:
