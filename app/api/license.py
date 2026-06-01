@@ -102,6 +102,16 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         "plan_distribution": plan_data,
     }
 
+@router.get("/fix-db")
+async def fix_db(db: AsyncSession = Depends(get_db)):
+    try:
+        from sqlalchemy import text
+        await db.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro'"))
+        await db.commit()
+        return {"status": "success", "message": "Column added"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/debug")
 async def debug_db(db: AsyncSession = Depends(get_db)):
     try:
