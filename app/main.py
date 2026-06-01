@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. Khởi tạo bảng dữ liệu
-    print("[*] Đang kiểm tra và khởi tạo database...")
+    print("[*] Checking and initializing database...")
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -21,18 +21,18 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro'"))
             except Exception:
                 pass
-        print("[+] Khởi tạo database thành công!")
+        print("[+] Database initialized successfully!")
     except Exception as e:
-        print(f"[!] LỖI khởi tạo database: {e}")
+        print(f"[!] Database init ERROR: {e}")
     
     # 2. Tạo User Admin mặc định nếu chưa có
-    print("[*] Kiểm tra tài khoản Admin...")
+    print("[*] Checking Admin account...")
     try:
         async with AsyncSession(engine) as session:
             result = await session.execute(select(User).where(User.email == "vubinhan094@gmail.com"))
             admin = result.scalar_one_or_none()
             if not admin:
-                print("[*] Khởi tạo tài khoản Admin mặc định...")
+                print("[*] Initializing default Admin account...")
                 hashed_pwd = security.get_password_hash("Vubinhan336!@#")
                 new_admin = User(
                     email="vubinhan094@gmail.com",
@@ -42,15 +42,15 @@ async def lifespan(app: FastAPI):
                 )
                 session.add(new_admin)
                 await session.commit()
-                print("[+] Đã tạo Admin mặc định.")
+                print("[+] Default Admin created.")
             else:
-                print("[*] Đã có Admin, cập nhật mật khẩu mới...")
+                print("[*] Admin exists, updating password...")
                 admin.hashed_password = security.get_password_hash("Vubinhan336!@#")
                 session.add(admin)
                 await session.commit()
-                print("[+] Đã cập nhật Admin.")
+                print("[+] Admin updated.")
     except Exception as e:
-        print(f"[!] LỖI khởi tạo Admin: {e}")
+        print(f"[!] Admin init ERROR: {e}")
             
     yield
 
