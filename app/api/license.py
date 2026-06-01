@@ -127,6 +127,16 @@ async def fix_db(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.get("/init-db")
+async def init_db():
+    try:
+        from app.core.database import engine, Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        return {"status": "success", "message": "Tables created"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/debug")
 async def debug_db(db: AsyncSession = Depends(get_db)):
     try:
