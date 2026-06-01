@@ -16,6 +16,11 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            try:
+                from sqlalchemy import text
+                await conn.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro'"))
+            except Exception:
+                pass
         print("[+] Khởi tạo database thành công!")
     except Exception as e:
         print(f"[!] LỖI khởi tạo database: {e}")
