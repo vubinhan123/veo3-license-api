@@ -16,6 +16,7 @@ elif DATABASE_URL.startswith("postgresql://"):
 DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require")
 DATABASE_URL = DATABASE_URL.replace("&channel_binding=require", "")
 DATABASE_URL = DATABASE_URL.replace("?channel_binding=require", "")
+DATABASE_URL = DATABASE_URL.replace("-pooler", "")
 
 # SQLite khong ho tro pool_size va max_overflow
 engine_params = {}
