@@ -150,20 +150,21 @@ async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(
     try:
         result = await db.execute(select(License).where(License.tool_type == tool_type))
         licenses = result.scalars().all()
+        
+        # He thong tu dong dong bo lai cac Device cu vao bang License
+        for lic in licenses:
+            if not lic.hwid:
+                dev_result = await db.execute(select(Device).where(Device.license_id == lic.id))
+                first_dev = dev_result.scalars().first()
+                if first_dev:
+                    lic.hwid = first_dev.hwid
+                    db.add(lic)
+        await db.commit()
+        
+        return licenses
     except Exception as e:
-        return {"error": str(e), "type": str(type(e))}
-    
-    # He thong tu dong dong bo lai cac Device cu vao bang License
-    for lic in licenses:
-        if not lic.hwid:
-            dev_result = await db.execute(select(Device).where(Device.license_id == lic.id))
-            first_dev = dev_result.scalars().first()
-            if first_dev:
-                lic.hwid = first_dev.hwid
-                db.add(lic)
-    await db.commit()
-    
-    return licenses
+        import traceback
+        return {"error": str(e), "type": str(type(e)), "traceback": traceback.format_exc()}
 
 @router.get("/logs")
 async def get_logs(db: AsyncSession = Depends(get_db)):
