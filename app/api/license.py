@@ -152,6 +152,7 @@ async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(
         licenses = result.scalars().all()
         
         # He thong tu dong dong bo lai cac Device cu vao bang License
+        result_list = []
         for lic in licenses:
             if not lic.hwid:
                 dev_result = await db.execute(select(Device).where(Device.license_id == lic.id))
@@ -159,9 +160,26 @@ async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(
                 if first_dev:
                     lic.hwid = first_dev.hwid
                     db.add(lic)
+            
+            # Chuyen model thanh dict de tranh loi MissingGreenletError khi FastAPI serialize
+            result_list.append({
+                "id": lic.id,
+                "license_key": lic.license_key,
+                "customer_name": lic.customer_name,
+                "customer_email": lic.customer_email,
+                "plan_type": lic.plan_type,
+                "expire_date": lic.expire_date.isoformat() if lic.expire_date else None,
+                "max_devices": lic.max_devices,
+                "status": lic.status,
+                "hwid": lic.hwid,
+                "enabled_modules": lic.enabled_modules,
+                "tool_type": lic.tool_type,
+                "created_at": lic.created_at.isoformat() if lic.created_at else None,
+                "updated_at": lic.updated_at.isoformat() if lic.updated_at else None
+            })
+            
         await db.commit()
-        
-        return licenses
+        return result_list
     except Exception as e:
         import traceback
         return {"error": str(e), "type": str(type(e)), "traceback": traceback.format_exc()}
