@@ -35,6 +35,7 @@ class LicenseBase(BaseModel):
     expire_date: datetime
     max_devices: int = 1
     enabled_modules: dict = {}
+    tool_type: str = "veo3_pro"
 
 class LicenseCreate(LicenseBase):
     license_key: Optional[str] = None

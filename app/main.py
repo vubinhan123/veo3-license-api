@@ -5,36 +5,47 @@ from app.core.database import engine, Base
 from app.api import license, auth
 from app.core.config import settings
 from app.core import security
-from app.models.models import User
+from app.models.models import User, License, Device, Log
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Khởi tạo bảng dữ liệu
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # 1. Khởi tạo bảng dữ liệu
+    print("[*] Đang kiểm tra và khởi tạo database...")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[+] Khởi tạo database thành công!")
+    except Exception as e:
+        print(f"[!] LỖI khởi tạo database: {e}")
     
-    # Tạo User Admin mặc định nếu chưa có
-    async with AsyncSession(engine) as session:
-        result = await session.execute(select(User).where(User.email == "vubinhan094@gmail.com"))
-        admin = result.scalar_one_or_none()
-        if not admin:
-            print("[*] Khoi tao tai khoan Admin mac dinh...")
-            hashed_pwd = security.get_password_hash("Vubinhan336!@#")
-            new_admin = User(
-                email="vubinhan094@gmail.com",
-                hashed_password=hashed_pwd,
-                role="admin",
-                is_active=True
-            )
-            session.add(new_admin)
-            await session.commit()
-        else:
-            print("[*] Da co Admin, dang cap nhat mat khau moi...")
-            admin.hashed_password = security.get_password_hash("Vubinhan336!@#")
-            session.add(admin)
-            await session.commit()
+    # 2. Tạo User Admin mặc định nếu chưa có
+    print("[*] Kiểm tra tài khoản Admin...")
+    try:
+        async with AsyncSession(engine) as session:
+            result = await session.execute(select(User).where(User.email == "vubinhan094@gmail.com"))
+            admin = result.scalar_one_or_none()
+            if not admin:
+                print("[*] Khởi tạo tài khoản Admin mặc định...")
+                hashed_pwd = security.get_password_hash("Vubinhan336!@#")
+                new_admin = User(
+                    email="vubinhan094@gmail.com",
+                    hashed_password=hashed_pwd,
+                    role="admin",
+                    is_active=True
+                )
+                session.add(new_admin)
+                await session.commit()
+                print("[+] Đã tạo Admin mặc định.")
+            else:
+                print("[*] Đã có Admin, cập nhật mật khẩu mới...")
+                admin.hashed_password = security.get_password_hash("Vubinhan336!@#")
+                session.add(admin)
+                await session.commit()
+                print("[+] Đã cập nhật Admin.")
+    except Exception as e:
+        print(f"[!] LỖI khởi tạo Admin: {e}")
             
     yield
 

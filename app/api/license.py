@@ -103,8 +103,8 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     }
 
 @router.get("/", response_model=List[schemas.License])
-async def list_licenses(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(License))
+async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(License).where(License.tool_type == tool_type))
     licenses = result.scalars().all()
     
     # He thong tu dong dong bo lai cac Device cu vao bang License
@@ -170,7 +170,8 @@ async def create_license(data: schemas.LicenseCreate, db: AsyncSession = Depends
         max_devices=1,  # Luon la 1 - khoa cung 1 key = 1 may
         status="active",
         hwid=data.hwid,
-        enabled_modules=data.enabled_modules
+        enabled_modules=data.enabled_modules,
+        tool_type=data.tool_type
     )
     db.add(new_license)
     await db.flush()

@@ -26,6 +26,7 @@ class License(Base):
     status = Column(String, default="active")
     hwid = Column(String, nullable=True)  # HWID cua may dau tien kich hoat
     enabled_modules = Column(JSON, default={})
+    tool_type = Column(String, default="veo3_pro")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

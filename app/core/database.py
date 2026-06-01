@@ -20,7 +20,8 @@ else:
     engine_params = {
         "echo": False,
         "pool_size": 10,
-        "max_overflow": 20
+        "max_overflow": 20,
+        "connect_args": {"ssl": True}
     }
 
 engine = create_async_engine(DATABASE_URL, **engine_params)
