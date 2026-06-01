@@ -102,6 +102,14 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         "plan_distribution": plan_data,
     }
 
+@router.get("/debug")
+async def debug_db(db: AsyncSession = Depends(get_db)):
+    try:
+        result = await db.execute(select(License))
+        return {"status": "ok", "count": len(result.scalars().all())}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @router.get("/", response_model=List[schemas.License])
 async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(License).where(License.tool_type == tool_type))
