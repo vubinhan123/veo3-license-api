@@ -104,11 +104,18 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 
 @router.get("/env")
 async def debug_env():
-    import os, re
+    import os
+    from urllib.parse import urlparse
     url = os.getenv("DATABASE_URL", "NOT_FOUND")
-    # Mask password
-    masked = re.sub(r":([^@]+)@", ":***@", url)
-    return {"DATABASE_URL": masked}
+    parsed = urlparse(url)
+    return {
+        "scheme": parsed.scheme,
+        "username": parsed.username,
+        "password_len": len(parsed.password) if parsed.password else 0,
+        "hostname": parsed.hostname,
+        "path": parsed.path,
+        "query": parsed.query
+    }
 
 @router.get("/fix-db")
 async def fix_db(db: AsyncSession = Depends(get_db)):
