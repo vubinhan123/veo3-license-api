@@ -39,10 +39,7 @@ else:
     }
     # Create SSL context for NeonDB to support SNI
     if requires_ssl or "neon.tech" in DATABASE_URL:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        engine_params["connect_args"] = {"ssl": ctx}
+        engine_params["connect_args"] = {"ssl": "require"}
 
 engine = create_async_engine(DATABASE_URL, **engine_params)
 
