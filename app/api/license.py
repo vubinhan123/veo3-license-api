@@ -6,7 +6,7 @@ from app.models.models import License, Device, Log
 from app.schemas.schemas import VerifyRequest, VerifyResponse
 from app.core.security import create_license_signature
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Any
 import uuid
 
 from app.schemas import schemas
@@ -110,10 +110,13 @@ async def debug_db(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@router.get("/", response_model=List[schemas.License])
+@router.get("/", response_model=Any)
 async def list_licenses(tool_type: str = "veo3_pro", db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(License).where(License.tool_type == tool_type))
-    licenses = result.scalars().all()
+    try:
+        result = await db.execute(select(License).where(License.tool_type == tool_type))
+        licenses = result.scalars().all()
+    except Exception as e:
+        return {"error": str(e), "type": str(type(e))}
     
     # He thong tu dong dong bo lai cac Device cu vao bang License
     for lic in licenses:
