@@ -25,6 +25,16 @@ else:
         "pool_size": 10,
         "max_overflow": 20
     }
+    # NeonDB requires endpoint ID in options if SNI fails
+    if "neon.tech" in DATABASE_URL:
+        from urllib.parse import urlparse
+        parsed = urlparse(DATABASE_URL)
+        hostname = parsed.hostname
+        if hostname and hostname.startswith("ep-"):
+            endpoint_id = hostname.split(".")[0]
+            engine_params["connect_args"] = {
+                "server_settings": {"options": f"project={endpoint_id}"}
+            }
 
 engine = create_async_engine(DATABASE_URL, **engine_params)
 
