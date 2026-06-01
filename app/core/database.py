@@ -12,6 +12,10 @@ if DATABASE_URL.startswith("postgres://"):
 elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+# asyncpg does not support sslmode in the URL query string
+if "?" in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.split("?")[0]
+
 # SQLite khong ho tro pool_size va max_overflow
 engine_params = {}
 if DATABASE_URL.startswith("sqlite"):
