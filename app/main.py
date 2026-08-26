@@ -11,34 +11,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Khởi tạo bảng dữ liệu
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Tự động migrate thêm cột tool_type nếu chưa có trong DB (PostgreSQL / SQLite)
-        try:
-            from sqlalchemy import text
-            await conn.execute(text("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS tool_type VARCHAR DEFAULT 'veo3_pro';"))
-        except Exception:
+    # Khởi tạo bảng dữ liệu và migration an toàn
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            # Tự động migrate thêm cột tool_type nếu chưa có trong DB (PostgreSQL / SQLite)
             try:
-                await conn.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro';"))
+                from sqlalchemy import text
+                await conn.execute(text("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS tool_type VARCHAR DEFAULT 'veo3_pro';"))
             except Exception:
-                pass
+                try:
+                    await conn.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro';"))
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"[!] Warning: DB table init in lifespan: {e}")
     
     # Tạo User Admin mặc định nếu chưa có
-    async with AsyncSession(engine) as session:
-        result = await session.execute(select(User).where(User.email == "vubinhan094@gmail.com"))
-        admin = result.scalar_one_or_none()
-        if not admin:
-            print("[*] Khoi tao tai khoan Admin mac dinh...")
-            hashed_pwd = security.get_password_hash("Vubinhan336!@#")
-            new_admin = User(
-                email="vubinhan094@gmail.com",
-                hashed_password=hashed_pwd,
-                role="admin",
-                is_active=True
-            )
-            session.add(new_admin)
-            await session.commit()
+    try:
+        async with AsyncSession(engine) as session:
+            result = await session.execute(select(User).where(User.email == "vubinhan094@gmail.com"))
+            admin = result.scalar_one_or_none()
+            if not admin:
+                print("[*] Khoi tao tai khoan Admin mac dinh...")
+                hashed_pwd = security.get_password_hash("Vubinhan336!@#")
+                new_admin = User(
+                    email="vubinhan094@gmail.com",
+                    hashed_password=hashed_pwd,
+                    role="admin",
+                    is_active=True
+                )
+                session.add(new_admin)
+                await session.commit()
+    except Exception as e:
+        print(f"[!] Warning: Admin user creation in lifespan: {e}")
             
     yield
 
