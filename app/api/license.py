@@ -13,6 +13,21 @@ from app.schemas import schemas
 
 router = APIRouter()
 
+@router.get("/debug-db")
+async def debug_db(db: AsyncSession = Depends(get_db)):
+    try:
+        from app.models.models import License, User
+        from sqlalchemy import text
+        res = await db.execute(text("SELECT 1;"))
+        u_res = await db.execute(select(User).limit(1))
+        user = u_res.scalar_one_or_none()
+        l_res = await db.execute(select(License).limit(1))
+        lic = l_res.scalar_one_or_none()
+        return {"status": "ok", "db_connected": True, "has_user": user is not None, "has_lic": lic is not None}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.get("/test-error")
 async def test_error():
     try:
