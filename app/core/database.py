@@ -13,13 +13,9 @@ if DATABASE_URL.startswith("postgres://"):
 elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+asyncpg://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# asyncpg khong nhan tham so sslmode trong query string
+# asyncpg khong nhan cac query params cua libpq (sslmode, channel_binding, v.v.)
 if "asyncpg" in DATABASE_URL:
-    DATABASE_URL = re.sub(r'[?&]sslmode=[^&]+', '', DATABASE_URL)
-    if '?' not in DATABASE_URL and '&' in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL.replace('&', '?', 1)
-    if DATABASE_URL.endswith('?'):
-        DATABASE_URL = DATABASE_URL[:-1]
+    DATABASE_URL = DATABASE_URL.split("?")[0]
 
 # SQLite khong ho tro pool_size va max_overflow
 engine_params = {}
