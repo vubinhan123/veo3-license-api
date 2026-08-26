@@ -6,7 +6,7 @@ from app.models.models import License, Device, Log
 from app.schemas.schemas import VerifyRequest, VerifyResponse
 from app.core.security import create_license_signature
 from datetime import datetime, timezone, timedelta
-from typing import List
+from typing import List, Optional
 import uuid
 
 from app.schemas import schemas
@@ -103,8 +103,11 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     }
 
 @router.get("/", response_model=List[schemas.License])
-async def list_licenses(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(License))
+async def list_licenses(tool_type: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    query = select(License)
+    if tool_type and tool_type != "all":
+        query = query.where(License.tool_type == tool_type)
+    result = await db.execute(query.order_by(License.created_at.desc()))
     return result.scalars().all()
 
 @router.get("/logs")
@@ -157,6 +160,7 @@ async def create_license(data: schemas.LicenseCreate, db: AsyncSession = Depends
         expire_date=data.expire_date,
         max_devices=1,  # Luon la 1 - khoa cung 1 key = 1 may
         status="active",
+        tool_type=data.tool_type or "veo3_pro",
         enabled_modules=data.enabled_modules
     )
     db.add(new_license)
@@ -226,7 +230,25 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
     if exp < datetime.utcnow():
         return VerifyResponse(status="fail", message="License đã hết hạn")
     
-    # 3. Kiểm tra thiết bị (HWID Binding)
+    # 3. Kiểm tra phân quyền Tool (Tool Isolation)
+    req_tool = request.tool_type or "veo3_pro"
+    lic_tool = db_license.tool_type or "veo3_pro"
+    
+    # Cho phép nếu đúng tool hoặc key là gói combo_all / all
+    if lic_tool not in [req_tool, "combo_all", "all"]:
+        tool_names = {
+            "veo3_pro": "VEO3 PRO",
+            "image_pro": "IMAGE PRO",
+            "tool_voice": "TOOL VOICE"
+        }
+        lic_name = tool_names.get(lic_tool, lic_tool)
+        req_name = tool_names.get(req_tool, req_tool)
+        return VerifyResponse(
+            status="fail", 
+            message=f"Key này chỉ thuộc bản quyền của '{lic_name}', không thể dùng cho '{req_name}'!"
+        )
+    
+    # 4. Kiểm tra thiết bị (HWID Binding)
     result = await db.execute(select(Device).where(Device.license_id == db_license.id))
     devices = result.scalars().all()
     
@@ -249,14 +271,20 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         if current_device.status != "active":
             return VerifyResponse(status="fail", message="Thiết bị đã bị chặn")
     
-    # 4. Ghi log thành công
-    new_log = Log(event_type="verify_success", license_id=db_license.id, hwid=request.hwid)
+    # 5. Ghi log thành công
+    new_log = Log(
+        event_type="verify_success", 
+        license_id=db_license.id, 
+        hwid=request.hwid,
+        details={"tool_requested": req_tool, "license_tool": lic_tool}
+    )
     db.add(new_log)
     
-    # 5. Ký Token cho Client
+    # 6. Ký Token cho Client
     payload = {
         "license_key": db_license.license_key,
         "hwid": request.hwid,
+        "tool_type": db_license.tool_type,
         "modules": db_license.enabled_modules,
         "expiry": db_license.expire_date.isoformat()
     }
@@ -266,6 +294,7 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         status="success",
         token=token,
         message="Xác thực thành công",
+        tool_type=db_license.tool_type,
         expiry=db_license.expire_date,
         modules=db_license.enabled_modules
     )

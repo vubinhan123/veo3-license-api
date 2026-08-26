@@ -24,6 +24,7 @@ class License(Base):
     expire_date = Column(DateTime(timezone=True), nullable=False)
     max_devices = Column(Integer, default=1)
     status = Column(String, default="active")
+    tool_type = Column(String, default="veo3_pro", index=True)  # veo3_pro, image_pro, tool_voice, combo_all
     hwid = Column(String, nullable=True)  # HWID cua may dau tien kich hoat
     enabled_modules = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
