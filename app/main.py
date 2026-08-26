@@ -5,7 +5,7 @@ from app.core.database import engine, Base
 from app.api import license, auth
 from app.core.config import settings
 from app.core import security
-from app.models.models import User
+from app.models.models import User, License, Device, Log
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
