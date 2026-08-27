@@ -250,12 +250,14 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         req_tool = request.tool_type or "veo3_pro"
         lic_tool = db_license.tool_type or "veo3_pro"
         
-        # Cho phép nếu đúng tool hoặc key là gói combo_all / all
-        if lic_tool not in [req_tool, "combo_all", "all"]:
+        # Cho phép nếu đúng tool hoặc key là gói combo_all / all / key_test
+        if lic_tool not in [req_tool, "combo_all", "all", "key_test"]:
             tool_names = {
                 "veo3_pro": "VEO3 PRO",
                 "image_pro": "IMAGE PRO",
-                "tool_voice": "TOOL VOICE"
+                "tool_voice": "TOOL VOICE",
+                "combo_all": "KEY TEST (TẤT CẢ TOOL)",
+                "key_test": "KEY TEST (TẤT CẢ TOOL)"
             }
             lic_name = tool_names.get(lic_tool, lic_tool)
             req_name = tool_names.get(req_tool, req_tool)
