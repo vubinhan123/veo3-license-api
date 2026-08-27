@@ -15,15 +15,21 @@ async def lifespan(app: FastAPI):
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            # Tự động migrate thêm cột tool_type nếu chưa có trong DB (PostgreSQL / SQLite)
-            try:
-                from sqlalchemy import text
-                await conn.execute(text("ALTER TABLE licenses ADD COLUMN IF NOT EXISTS tool_type VARCHAR DEFAULT 'veo3_pro';"))
-            except Exception:
+            # Tự động migrate thêm các cột nếu chưa có trong DB (PostgreSQL / SQLite)
+            for col_sql in [
+                ("tool_type", "ALTER TABLE licenses ADD COLUMN IF NOT EXISTS tool_type VARCHAR DEFAULT 'veo3_pro';", "ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro';"),
+                ("reset_count", "ALTER TABLE licenses ADD COLUMN IF NOT EXISTS reset_count INTEGER DEFAULT 0;", "ALTER TABLE licenses ADD COLUMN reset_count INTEGER DEFAULT 0;"),
+                ("last_heartbeat", "ALTER TABLE licenses ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP WITH TIME ZONE;", "ALTER TABLE licenses ADD COLUMN last_heartbeat TIMESTAMP;"),
+                ("note", "ALTER TABLE licenses ADD COLUMN IF NOT EXISTS note VARCHAR;", "ALTER TABLE licenses ADD COLUMN note VARCHAR;")
+            ]:
                 try:
-                    await conn.execute(text("ALTER TABLE licenses ADD COLUMN tool_type VARCHAR DEFAULT 'veo3_pro';"))
+                    from sqlalchemy import text
+                    await conn.execute(text(col_sql[1]))
                 except Exception:
-                    pass
+                    try:
+                        await conn.execute(text(col_sql[2]))
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"[!] Warning: DB table init in lifespan: {e}")
     

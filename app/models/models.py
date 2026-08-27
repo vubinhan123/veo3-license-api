@@ -26,6 +26,9 @@ class License(Base):
     status = Column(String, default="active")
     tool_type = Column(String, default="veo3_pro", index=True)  # veo3_pro, image_pro, tool_voice, combo_all
     hwid = Column(String, nullable=True)  # HWID cua may dau tien kich hoat
+    reset_count = Column(Integer, default=0)  # So lan da reset HWID
+    last_heartbeat = Column(DateTime(timezone=True), nullable=True)  # Thoi diem ping gan nhat
+    note = Column(String, nullable=True)  # Ghi chu khach hang / CTV
     enabled_modules = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, delete, func as sa_func
 from app.core.database import get_db
 from app.models.models import License, Device, Log
 from app.schemas.schemas import VerifyRequest, VerifyResponse
@@ -45,35 +45,47 @@ async def test_error():
 
 @router.get("/stats")
 async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
-    """Tra ve thong ke thuc te cho Dashboard"""
-    now = datetime.utcnow()  # SQLite luu datetime naive, phai dung naive de so sanh
+    """Tra ve thong ke thuc te cho Dashboard voi 4 trang thai ro rang"""
+    now = datetime.utcnow()
     
     # 1. Dem key theo trang thai
     all_licenses = await db.execute(select(License))
     licenses = all_licenses.scalars().all()
     
-    active_count = sum(1 for l in licenses if l.status == "active")
-    revoked_count = sum(1 for l in licenses if l.status == "revoked")
-    
-    # 2. Key sap het han (trong 7 ngay toi)
+    active_count = 0
+    expired_count = 0
+    revoked_count = 0
     expiring_soon = 0
+    tool_dist = {}
+    
     for l in licenses:
-        if l.status == "active" and l.expire_date:
+        tool_key = l.tool_type or "veo3_pro"
+        tool_dist[tool_key] = tool_dist.get(tool_key, 0) + 1
+        
+        if l.status == "revoked":
+            revoked_count += 1
+            continue
+        
+        if l.expire_date:
             try:
                 exp = l.expire_date.replace(tzinfo=None) if l.expire_date.tzinfo else l.expire_date
-                if exp < now + timedelta(days=7):
-                    expiring_soon += 1
-            except:
-                pass
+                if exp < now:
+                    expired_count += 1
+                else:
+                    active_count += 1
+                    if exp <= now + timedelta(days=7):
+                        expiring_soon += 1
+            except Exception:
+                active_count += 1
+        else:
+            active_count += 1
     
-    # 3. Dem thiet bi
+    # 2. Dem thiet bi & key da gan HWID
     all_devices = await db.execute(select(Device))
     device_count = len(all_devices.scalars().all())
-    
-    # 4. Dem key da kich hoat (co HWID)
     activated_count = sum(1 for l in licenses if l.hwid)
     
-    # 5. Logs 24h
+    # 3. Logs 24h
     try:
         all_logs = await db.execute(select(Log))
         logs = all_logs.scalars().all()
@@ -91,22 +103,41 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         logs_24h = 0
         total_logs = 0
     
-    # 6. Phan bo goi
+    # 4. Phan bo goi
     plan_dist = {}
     for l in licenses:
         plan_dist[l.plan_type] = plan_dist.get(l.plan_type, 0) + 1
     
     plan_colors = {
         "Trial": "#94a3b8", "Monthly": "#6366f1", 
-        "Yearly": "#8b5cf6", "Permanent": "#d946ef"
+        "Yearly": "#8b5cf6", "Permanent": "#d946ef", "Custom": "#06b6d4"
     }
     plan_data = [
         {"name": k, "value": v, "color": plan_colors.get(k, "#6366f1")} 
         for k, v in plan_dist.items()
     ]
     
+    # 5. Phan bo Tool
+    tool_names_map = {
+        "veo3_pro": "VEO3 PRO",
+        "image_pro": "IMAGE PRO",
+        "tool_voice": "TOOL VOICE",
+        "combo_all": "KEY TEST"
+    }
+    tool_colors = {
+        "veo3_pro": "#3b82f6",
+        "image_pro": "#a855f7",
+        "tool_voice": "#10b981",
+        "combo_all": "#f59e0b"
+    }
+    tool_data = [
+        {"tool_type": k, "name": tool_names_map.get(k, k), "count": v, "color": tool_colors.get(k, "#3b82f6")}
+        for k, v in tool_dist.items()
+    ]
+    
     return {
         "active_licenses": active_count,
+        "expired_licenses": expired_count,
         "revoked_licenses": revoked_count,
         "total_licenses": len(licenses),
         "devices_online": device_count,
@@ -115,6 +146,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         "total_logs": total_logs,
         "expiring_soon": expiring_soon,
         "plan_distribution": plan_data,
+        "tool_distribution": tool_data,
     }
 
 @router.get("/", response_model=List[schemas.License])
@@ -211,6 +243,133 @@ async def update_license(license_id: str, data: dict, db: AsyncSession = Depends
     await db.commit()
     await db.refresh(db_license)
     return db_license
+
+@router.post("/batch", response_model=List[schemas.License])
+async def create_batch_licenses(data: schemas.BatchLicenseCreate, db: AsyncSession = Depends(get_db)):
+    """Tao nhieu key cung luc (Batch Generator)"""
+    import secrets
+    created_list = []
+    exp_date = datetime.now(timezone.utc) + timedelta(days=data.expire_days)
+    
+    for i in range(data.count):
+        raw = secrets.token_hex(16).upper()
+        key = "-".join([raw[j:j+4] for j in range(0, 32, 4)])
+        name = f"{data.customer_prefix} #{i+1}" if data.customer_prefix else None
+        
+        new_lic = License(
+            license_key=key,
+            customer_name=name,
+            customer_email=None,
+            plan_type=data.plan_type,
+            expire_date=exp_date,
+            max_devices=1,
+            status="active",
+            tool_type=data.tool_type or "veo3_pro",
+            note=data.note,
+            enabled_modules={}
+        )
+        db.add(new_lic)
+        created_list.append(new_lic)
+        
+    await db.flush()
+    
+    log = Log(
+        event_type="tao_key_hang_loat", 
+        details={"count": data.count, "tool_type": data.tool_type, "plan_type": data.plan_type}
+    )
+    db.add(log)
+    
+    await db.commit()
+    for lic in created_list:
+        await db.refresh(lic)
+    return created_list
+
+@router.post("/renew/{license_id}", response_model=schemas.License)
+async def renew_license(license_id: str, data: schemas.LicenseRenew, db: AsyncSession = Depends(get_db)):
+    """Gia han nhanh 1-Click (+30 ngay, +90 ngay, +1 nam)"""
+    result = await db.execute(select(License).where(License.id == license_id))
+    db_license = result.scalar_one_or_none()
+    if not db_license:
+        raise HTTPException(status_code=404, detail="License not found")
+        
+    now = datetime.now(timezone.utc)
+    current_exp = db_license.expire_date
+    if current_exp.tzinfo is None:
+        current_exp = current_exp.replace(tzinfo=timezone.utc)
+        
+    base_date = max(now, current_exp)
+    db_license.expire_date = base_date + timedelta(days=data.days)
+    db_license.status = "active"
+    if data.plan_type:
+        db_license.plan_type = data.plan_type
+        
+    log = Log(
+        event_type="gia_han", 
+        license_id=license_id, 
+        details={"extended_days": data.days, "new_expiry": db_license.expire_date.isoformat()}
+    )
+    db.add(log)
+    
+    await db.commit()
+    await db.refresh(db_license)
+    return db_license
+
+@router.post("/reset-hwid/{license_id}", response_model=schemas.License)
+async def reset_hwid(license_id: str, db: AsyncSession = Depends(get_db)):
+    """Reset ma may HWID de khach doi sang may tinh khac"""
+    result = await db.execute(select(License).where(License.id == license_id))
+    db_license = result.scalar_one_or_none()
+    if not db_license:
+        raise HTTPException(status_code=404, detail="License not found")
+        
+    old_hwid = db_license.hwid
+    db_license.hwid = None
+    db_license.reset_count = (db_license.reset_count or 0) + 1
+    
+    await db.execute(delete(Device).where(Device.license_id == license_id))
+    
+    log = Log(
+        event_type="reset_hwid", 
+        license_id=license_id, 
+        details={"old_hwid": old_hwid, "total_resets": db_license.reset_count}
+    )
+    db.add(log)
+    
+    await db.commit()
+    await db.refresh(db_license)
+    return db_license
+
+@router.post("/heartbeat", response_model=schemas.HeartbeatResponse)
+async def license_heartbeat(request: schemas.HeartbeatRequest, db: AsyncSession = Depends(get_db)):
+    """Kiem tra online dinh ky (Heartbeat) tu Client Tool de thu hoi tuc thi neu can"""
+    result = await db.execute(select(License).where(License.license_key == request.license_key))
+    db_license = result.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    
+    if not db_license:
+        return schemas.HeartbeatResponse(status="invalid", message="License không tồn tại", server_time=now)
+        
+    if db_license.status == "revoked":
+        return schemas.HeartbeatResponse(status="revoked", message="License đã bị thu hồi bởi quản trị viên!", server_time=now)
+        
+    exp = db_license.expire_date
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+        
+    diff = exp - now
+    days_left = max(0, diff.days)
+    if diff.total_seconds() <= 0:
+        return schemas.HeartbeatResponse(status="expired", message="License đã hết hạn!", days_remaining=0, server_time=now)
+        
+    db_license.last_heartbeat = now
+    await db.commit()
+    
+    return schemas.HeartbeatResponse(
+        status="active", 
+        message="OK", 
+        days_remaining=days_left,
+        server_time=now
+    )
 
 @router.delete("/{license_id}")
 async def delete_license(license_id: str, db: AsyncSession = Depends(get_db)):

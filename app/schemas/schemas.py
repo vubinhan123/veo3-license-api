@@ -41,6 +41,19 @@ class LicenseCreate(LicenseBase):
     license_key: Optional[str] = None
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
+    note: Optional[str] = None
+
+class LicenseRenew(BaseModel):
+    days: int = 30
+    plan_type: Optional[str] = None
+
+class BatchLicenseCreate(BaseModel):
+    count: int = Field(default=5, ge=1, le=100)
+    plan_type: str = "Monthly"
+    expire_days: int = 30
+    tool_type: str = "veo3_pro"
+    customer_prefix: Optional[str] = "Khách Sỉ"
+    note: Optional[str] = None
 
 class License(LicenseBase):
     id: str
@@ -49,12 +62,15 @@ class License(LicenseBase):
     customer_email: Optional[str] = None
     hwid: Optional[str] = None
     status: str
+    reset_count: Optional[int] = 0
+    last_heartbeat: Optional[datetime] = None
+    note: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
 
-# Verification
+# Verification & Anti-Crack
 class VerifyRequest(BaseModel):
     license_key: str
     hwid: str
@@ -68,3 +84,14 @@ class VerifyResponse(BaseModel):
     tool_type: Optional[str] = None
     expiry: Optional[datetime] = None
     modules: Optional[dict] = {}
+
+class HeartbeatRequest(BaseModel):
+    license_key: str
+    hwid: str
+    tool_type: Optional[str] = "veo3_pro"
+
+class HeartbeatResponse(BaseModel):
+    status: str  # "active" | "revoked" | "expired" | "invalid"
+    message: str
+    days_remaining: Optional[int] = 0
+    server_time: Optional[datetime] = None
