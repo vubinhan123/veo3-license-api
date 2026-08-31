@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.database import engine, Base
-from app.api import license, auth
+from app.api import license, auth, sepay
 from app.core.config import settings
 from app.core import security
 from app.models.models import User, License, Device, Log
@@ -72,6 +72,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 app.include_router(license.router, prefix=f"{settings.API_V1_STR}/license", tags=["License"])
+app.include_router(sepay.router, prefix=f"{settings.API_V1_STR}/sepay", tags=["SePay"])
 
 @app.get("/")
 async def root():
