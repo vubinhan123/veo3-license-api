@@ -54,10 +54,10 @@ async def sepay_webhook_handler(request: Request, db: AsyncSession = Depends(get
     if transfer_type != "in" or amount_in <= 0:
         return {"status": "ignored", "reason": "Not an incoming payment"}
 
-    # Tìm mã đơn hàng dạng VBAxxxx
-    match = re.search(r"(VBA\d+)", content.upper())
+    # Tìm mã đơn hàng dạng TOOLxxxx hoặc VBAxxxx
+    match = re.search(r"((?:TOOL|VBA|KEY|DH)\d+)", content.upper())
     if not match:
-        match = re.search(r"(VBA\d{4,6})", content.upper().replace(" ", ""))
+        match = re.search(r"((?:TOOL|VBA|KEY|DH)\d{4,6})", content.upper().replace(" ", ""))
 
     if not match:
         return {"status": "ignored", "reason": "No valid order code found in content"}
