@@ -51,8 +51,21 @@ async def lifespan(app: FastAPI):
                 await session.commit()
     except Exception as e:
         print(f"[!] Warning: Admin user creation in lifespan: {e}")
+
+    # Khởi chạy Telegram Shop Bot chạy ngầm 24/7 trên Cloud Render
+    bot_task = None
+    try:
+        import asyncio
+        from app.bot.runner import start_telegram_bot_cloud
+        bot_task = asyncio.create_task(start_telegram_bot_cloud())
+        print("[*] Telegram Shop Bot background task da khoi dong tren Cloud Render 24/7!")
+    except Exception as e:
+        print(f"[!] Warning starting Telegram Bot on Cloud: {e}")
             
     yield
+
+    if bot_task:
+        bot_task.cancel()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
