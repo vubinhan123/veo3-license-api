@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.database import engine, Base
-from app.api import license, auth, sepay
+from app.api import license, auth, sepay, telegram
 from app.core.config import settings
 from app.core import security
 from app.models.models import User, License, Device, Log
@@ -52,20 +52,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"[!] Warning: Admin user creation in lifespan: {e}")
 
-    # Khởi chạy Telegram Shop Bot chạy ngầm 24/7 trên Cloud Render
-    bot_task = None
+    # Đăng ký Telegram Webhook 24/7/365 với máy chủ Telegram
     try:
-        import asyncio
-        from app.bot.runner import start_telegram_bot_cloud
-        bot_task = asyncio.create_task(start_telegram_bot_cloud())
-        print("[*] Telegram Shop Bot background task da khoi dong tren Cloud Render 24/7!")
+        await telegram.setup_telegram_webhook()
+        print("✅ [CLOUD 24/7] Telegram Bot Webhook da kich hoat san sang 24/7 tren Render!")
     except Exception as e:
-        print(f"[!] Warning starting Telegram Bot on Cloud: {e}")
+        print(f"[!] Warning setting Telegram Webhook: {e}")
             
     yield
-
-    if bot_task:
-        bot_task.cancel()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -86,7 +80,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 app.include_router(license.router, prefix=f"{settings.API_V1_STR}/license", tags=["License"])
 app.include_router(sepay.router, prefix=f"{settings.API_V1_STR}/sepay", tags=["SePay"])
+app.include_router(telegram.router, prefix=f"{settings.API_V1_STR}/telegram", tags=["Telegram"])
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to VEO3 License Management API", "status": "online"}
+    return {"message": "Welcome to VEO3 License Management API", "status": "online", "telegram_bot": "@tool_tu_dong_bot"}
