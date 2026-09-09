@@ -28,6 +28,9 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    require_2fa: Optional[bool] = False
+    session_id: Optional[str] = None
+    message: Optional[str] = None
 
 # License Management
 class LicenseBase(BaseModel):
@@ -76,6 +79,8 @@ class VerifyRequest(BaseModel):
     hwid: str
     tool_type: Optional[str] = "veo3_pro"
     tool_version: Optional[str] = "1.0.0"
+    nonce: Optional[str] = None  # Anti-Replay: Chuỗi ngẫu nhiên từ client
+    timestamp: Optional[int] = None  # Anti-Replay: Mốc thời gian Unix từ client
 
 class VerifyResponse(BaseModel):
     status: str
@@ -84,6 +89,8 @@ class VerifyResponse(BaseModel):
     tool_type: Optional[str] = None
     expiry: Optional[datetime] = None
     modules: Optional[dict] = {}
+    nonce: Optional[str] = None
+    server_timestamp: Optional[int] = None
 
 class HeartbeatRequest(BaseModel):
     license_key: str

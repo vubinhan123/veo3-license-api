@@ -1,5 +1,6 @@
 import re
 import urllib.parse
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.models import License, Log
 from app.services.license_service import create_license_record
 
@@ -39,11 +41,33 @@ async def send_telegram_msg(chat_id: int, text: str):
 async def sepay_webhook_handler(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Webhook nhận thông báo biến động số dư từ SePay
-    Tự động sinh Key và gửi trực tiếp về Telegram của khách hàng
+    Tự động sinh Key và gửi trực tiếp về Telegram của khách hàng.
+    Đã được bảo vệ nghiêm ngặt bằng API Key xác thực.
     """
+    # 1. Bảo vệ Webhook SePay chống tấn công giả mạo giao dịch
+    if settings.SEPAY_API_KEY:
+        auth_header = request.headers.get("Authorization", "")
+        api_key_header = request.headers.get("X-API-KEY", "")
+        
+        provided_key = None
+        if auth_header.startswith("Apikey "):
+            provided_key = auth_header.split(" ", 1)[1].strip()
+        elif auth_header.startswith("Bearer "):
+            provided_key = auth_header.split(" ", 1)[1].strip()
+        elif api_key_header:
+            provided_key = api_key_header.strip()
+        else:
+            provided_key = request.query_params.get("token")
+            
+        if not provided_key or not secrets.compare_digest(provided_key, settings.SEPAY_API_KEY):
+            raise HTTPException(
+                status_code=401,
+                detail="Từ chối truy cập: SePay Webhook API Key không chính xác hoặc bị thiếu!"
+            )
+
     try:
         data = await request.json()
-        print(f"[*] Nhận Webhook SePay từ Render: {data}")
+        print(f"[*] Nhận Webhook SePay hợp lệ từ Render: {data}")
     except Exception as e:
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
@@ -65,7 +89,7 @@ async def sepay_webhook_handler(request: Request, db: AsyncSession = Depends(get
     order_code = match.group(1)
     
     # Kiểm tra xem mã đơn này đã từng được cấp key chưa (tránh trùng lặp)
-    existing_log = await db.execute(select(Log).where(Log.action == f"PAID_{order_code}"))
+    existing_log = await db.execute(select(Log).where(Log.event_type == f"PAID_{order_code}"))
     if existing_log.scalar_one_or_none():
         return {"status": "success", "message": f"Order {order_code} already processed"}
 
@@ -147,7 +171,7 @@ async def sepay_webhook_handler(request: Request, db: AsyncSession = Depends(get
         )
         
         # Ghi log để chống duplicate
-        paid_log = Log(action=f"PAID_{order_code}", details=f"License: {new_license.license_key}, Amount: {amount_in}")
+        paid_log = Log(event_type=f"PAID_{order_code}", details={"license_key": new_license.license_key, "amount": amount_in})
         db.add(paid_log)
         await db.commit()
 

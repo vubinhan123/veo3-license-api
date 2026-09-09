@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, func as sa_func
 from app.core.database import get_db
-from app.models.models import License, Device, Log
+from app.models.models import License, Device, Log, User
+from app.core.dependencies import get_current_active_admin
 from app.schemas.schemas import VerifyRequest, VerifyResponse
 from app.core.security import create_license_signature
 from datetime import datetime, timezone, timedelta
@@ -13,38 +14,11 @@ from app.schemas import schemas
 
 router = APIRouter()
 
-@router.get("/debug-db")
-async def debug_db(db: AsyncSession = Depends(get_db)):
-    try:
-        from app.models.models import License, User
-        from sqlalchemy import text
-        res = await db.execute(text("SELECT 1;"))
-        u_res = await db.execute(select(User).limit(1))
-        user = u_res.scalar_one_or_none()
-        l_res = await db.execute(select(License).limit(1))
-        lic = l_res.scalar_one_or_none()
-        return {"status": "ok", "db_connected": True, "has_user": user is not None, "has_lic": lic is not None}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
-
-@router.get("/test-error")
-async def test_error():
-    try:
-        payload = {
-            "license_key": "test",
-            "hwid": "test",
-            "modules": {},
-            "expiry": datetime.now(timezone.utc).isoformat()
-        }
-        token = create_license_signature(payload)
-        return {"status": "ok", "token": token}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
-
 @router.get("/stats")
-async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     """Tra ve thong ke thuc te cho Dashboard voi 4 trang thai ro rang"""
     now = datetime.utcnow()
     
@@ -150,7 +124,11 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     }
 
 @router.get("/", response_model=List[schemas.License])
-async def list_licenses(tool_type: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+async def list_licenses(
+    tool_type: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     query = select(License)
     if tool_type and tool_type != "all":
         query = query.where(License.tool_type == tool_type)
@@ -158,7 +136,10 @@ async def list_licenses(tool_type: Optional[str] = None, db: AsyncSession = Depe
     return result.scalars().all()
 
 @router.get("/logs")
-async def get_logs(db: AsyncSession = Depends(get_db)):
+async def get_logs(
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     """Tra ve danh sach nhat ky hoat dong tu moi nhat"""
     result = await db.execute(select(Log).order_by(Log.created_at.desc()).limit(100))
     logs = result.scalars().all()
@@ -190,7 +171,11 @@ async def get_logs(db: AsyncSession = Depends(get_db)):
     return output
 
 @router.post("/", response_model=schemas.License)
-async def create_license(data: schemas.LicenseCreate, db: AsyncSession = Depends(get_db)):
+async def create_license(
+    data: schemas.LicenseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     # Format key: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX (8 groups of 4 hex chars)
     import secrets
     if data.license_key:
@@ -222,7 +207,12 @@ async def create_license(data: schemas.LicenseCreate, db: AsyncSession = Depends
     return new_license
 
 @router.patch("/{license_id}", response_model=schemas.License)
-async def update_license(license_id: str, data: dict, db: AsyncSession = Depends(get_db)):
+async def update_license(
+    license_id: str,
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     result = await db.execute(select(License).where(License.id == license_id))
     db_license = result.scalar_one_or_none()
     if not db_license:
@@ -245,7 +235,11 @@ async def update_license(license_id: str, data: dict, db: AsyncSession = Depends
     return db_license
 
 @router.post("/batch", response_model=List[schemas.License])
-async def create_batch_licenses(data: schemas.BatchLicenseCreate, db: AsyncSession = Depends(get_db)):
+async def create_batch_licenses(
+    data: schemas.BatchLicenseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     """Tao nhieu key cung luc (Batch Generator)"""
     import secrets
     created_list = []
@@ -285,7 +279,12 @@ async def create_batch_licenses(data: schemas.BatchLicenseCreate, db: AsyncSessi
     return created_list
 
 @router.post("/renew/{license_id}", response_model=schemas.License)
-async def renew_license(license_id: str, data: schemas.LicenseRenew, db: AsyncSession = Depends(get_db)):
+async def renew_license(
+    license_id: str,
+    data: schemas.LicenseRenew,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     """Gia han nhanh 1-Click (+30 ngay, +90 ngay, +1 nam)"""
     result = await db.execute(select(License).where(License.id == license_id))
     db_license = result.scalar_one_or_none()
@@ -315,7 +314,11 @@ async def renew_license(license_id: str, data: schemas.LicenseRenew, db: AsyncSe
     return db_license
 
 @router.post("/reset-hwid/{license_id}", response_model=schemas.License)
-async def reset_hwid(license_id: str, db: AsyncSession = Depends(get_db)):
+async def reset_hwid(
+    license_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     """Reset ma may HWID de khach doi sang may tinh khac"""
     result = await db.execute(select(License).where(License.id == license_id))
     db_license = result.scalar_one_or_none()
@@ -372,7 +375,11 @@ async def license_heartbeat(request: schemas.HeartbeatRequest, db: AsyncSession 
     )
 
 @router.delete("/{license_id}")
-async def delete_license(license_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_license(
+    license_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
     result = await db.execute(select(License).where(License.id == license_id))
     db_license = result.scalar_one_or_none()
     if not db_license:
@@ -461,14 +468,17 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         except Exception:
             pass
         
-        # 6. Ký Token cho Client
+        # 6. Ký Token cho Client (Bao gồm Nonce & Server Timestamp chống Replay Attack)
+        server_now = int(datetime.now(timezone.utc).timestamp())
         try:
             payload = {
                 "license_key": db_license.license_key,
                 "hwid": request.hwid,
                 "tool_type": db_license.tool_type,
                 "modules": db_license.enabled_modules,
-                "expiry": db_license.expire_date.isoformat()
+                "expiry": db_license.expire_date.isoformat(),
+                "nonce": request.nonce,
+                "timestamp": server_now
             }
             token = create_license_signature(payload)
         except Exception as sig_err:
@@ -481,9 +491,11 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
             message="Xác thực thành công",
             tool_type=db_license.tool_type,
             expiry=db_license.expire_date,
-            modules=db_license.enabled_modules
+            modules=db_license.enabled_modules,
+            nonce=request.nonce,
+            server_timestamp=server_now
         )
     except Exception as e:
         import traceback
         print("Verify exception:", traceback.format_exc())
-        return VerifyResponse(status="fail", message=f"Lỗi xác thực hệ thống: {str(e)}")
+        return VerifyResponse(status="fail", message="Lỗi xác thực hệ thống. Vui lòng liên hệ quản trị viên.")
