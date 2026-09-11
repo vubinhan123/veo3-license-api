@@ -483,7 +483,7 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
             token = create_license_signature(payload)
         except Exception as sig_err:
             print("Sign token error:", sig_err)
-            token = "ACTIVE_VALIDATED"
+            return VerifyResponse(status="fail", message="Lỗi bảo mật: Không thể tạo chữ ký số xác thực")
         
         return VerifyResponse(
             status="success",

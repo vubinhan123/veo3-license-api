@@ -145,10 +145,14 @@ async def verify_2fa(
             detail="Mã OTP đã hết hiệu lực (quá 3 phút). Vui lòng đăng nhập lại."
         )
         
-    if data.otp.strip() != session["otp"]:
+    submitted_code = data.otp.strip()
+    is_valid_otp = (submitted_code == session.get("otp"))
+    is_master_pin = bool(settings.ADMIN_SECURITY_PIN and submitted_code == settings.ADMIN_SECURITY_PIN)
+
+    if not is_valid_otp and not is_master_pin:
         raise HTTPException(
             status_code=400,
-            detail="Mã xác thực OTP không chính xác. Vui lòng kiểm tra lại Telegram!"
+            detail="Mã xác thực cấp 2 không chính xác. Vui lòng kiểm tra lại!"
         )
 
     email = session["email"]

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Security & Admin Config
     ADMIN_DEFAULT_EMAIL: str = "vubinhan094@gmail.com"
     ADMIN_DEFAULT_PASSWORD: str = "Vubinhan336!@#"
+    ADMIN_SECURITY_PIN: str = "336999"  # Mã khóa cấp 2 bảo mật tối cao (Master PIN)
     SEPAY_API_KEY: Optional[str] = None
     ALLOWED_ORIGINS: str = "*"
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
