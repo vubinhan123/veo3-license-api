@@ -17,27 +17,8 @@ from pydantic import BaseModel, Field
 
 router = APIRouter()
 
-# Bộ nhớ đệm lưu phiên 2FA đang chờ: session_id -> { email, otp, expires_at, role, client_ip }
+# Bộ nhớ đệm lưu phiên xác thực cấp 2: session_id -> { email, role, expires_at, client_ip }
 pending_2fa: dict = {}
-
-async def send_telegram_alert(text: str):
-    """Gửi cảnh báo an ninh hoặc mã OTP về Telegram của Admin"""
-    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_ADMIN_CHAT_ID:
-        return False
-    url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": settings.TELEGRAM_ADMIN_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=8) as resp:
-                return resp.status == 200
-    except Exception as e:
-        print(f"[!] Warning: Cannot send Telegram 2FA/alert: {e}")
-        return False
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(
@@ -55,14 +36,6 @@ async def login_for_access_token(
     user = result.scalar_one_or_none()
     
     if not user or not security.verify_password(form_data.password, user.hashed_password):
-        # Bắn cảnh báo xâm nhập ngay lập tức về Telegram
-        await send_telegram_alert(
-            f"🚨 <b>CẢNH BÁO XÂM NHẬP WEB TẠO KEY:</b>\n\n"
-            f"Phát hiện lần thử đăng nhập <b>THẤT BẠI (SAI MẬT KHẨU)</b>!\n"
-            f"Email thử: <code>{form_data.username}</code>\n"
-            f"Địa chỉ IP: <code>{client_ip}</code>\n"
-            f"Thời gian: <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>"
-        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không chính xác",
@@ -72,48 +45,22 @@ async def login_for_access_token(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Tài khoản đã bị vô hiệu hóa")
 
-    # NẾU BẬT 2FA TELEGRAM: Sinh mã OTP và gửi về điện thoại
-    if settings.ENABLE_2FA_TELEGRAM:
-        otp = f"{random.randint(100000, 999999)}"
-        session_id = uuid.uuid4().hex
-        pending_2fa[session_id] = {
-            "email": user.email,
-            "otp": otp,
-            "role": user.role,
-            "expires_at": time.time() + 180,  # 3 phút
-            "client_ip": client_ip
-        }
+    # BẢO MẬT 2 LỚP ĐỘC LẬP: Chuyển sang bước xác thực Mã Khóa Cấp 2
+    session_id = uuid.uuid4().hex
+    pending_2fa[session_id] = {
+        "email": user.email,
+        "role": user.role,
+        "expires_at": time.time() + 300,  # 5 phút
+        "client_ip": client_ip
+    }
 
-        # Gửi OTP về Telegram Admin
-        msg = (
-            f"🔐 <b>MÃ XÁC THỰC 2 LỚP (2FA) - WEB TẠO KEY</b>\n\n"
-            f"Mã OTP của bạn: <b><code>{otp}</code></b>\n\n"
-            f"⏳ <i>Hiệu lực: 3 phút. Tuyệt đối không gửi mã này cho bất kỳ ai!</i>\n"
-            f"🌐 Thiết bị đăng nhập: <code>{client_ip}</code>"
-        )
-        await send_telegram_alert(msg)
-
-        return {
-            "access_token": "",
-            "refresh_token": "",
-            "token_type": "bearer",
-            "require_2fa": True,
-            "session_id": session_id,
-            "message": "Mã xác thực 2FA đã được gửi về Telegram của bạn. Vui lòng nhập để hoàn tất đăng nhập."
-        }
-        
-    # Nếu không bật 2FA: Cấp token trực tiếp
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = security.create_access_token(
-        data={"sub": user.email, "role": user.role},
-        expires_delta=access_token_expires
-    )
-    
     return {
-        "access_token": access_token,
-        "refresh_token": "N/A",
+        "access_token": "",
+        "refresh_token": "",
         "token_type": "bearer",
-        "require_2fa": False
+        "require_2fa": True,
+        "session_id": session_id,
+        "message": "Vui lòng nhập Mã Khóa Cấp 2 Bảo Mật để hoàn tất đăng nhập."
     }
 
 class Verify2FARequest(BaseModel):
@@ -126,33 +73,25 @@ async def verify_2fa(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    client_ip = request.client.host if request.client else "Unknown IP"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
-
     session = pending_2fa.get(data.session_id)
     if not session:
         raise HTTPException(
             status_code=400,
-            detail="Phiên xác thực 2FA không tồn tại hoặc đã hết hạn. Vui lòng đăng nhập lại."
+            detail="Phiên xác thực không tồn tại hoặc đã hết hạn. Vui lòng đăng nhập lại."
         )
         
     if time.time() > session["expires_at"]:
         del pending_2fa[data.session_id]
         raise HTTPException(
             status_code=400,
-            detail="Mã OTP đã hết hiệu lực (quá 3 phút). Vui lòng đăng nhập lại."
+            detail="Phiên xác thực đã quá thời gian (5 phút). Vui lòng đăng nhập lại."
         )
         
     submitted_code = data.otp.strip()
-    is_valid_otp = (submitted_code == session.get("otp"))
-    is_master_pin = bool(settings.ADMIN_SECURITY_PIN and submitted_code == settings.ADMIN_SECURITY_PIN)
-
-    if not is_valid_otp and not is_master_pin:
+    if submitted_code != settings.ADMIN_SECURITY_PIN:
         raise HTTPException(
             status_code=400,
-            detail="Mã xác thực cấp 2 không chính xác. Vui lòng kiểm tra lại!"
+            detail="Mã Khóa Cấp 2 Bảo Mật không chính xác. Vui lòng kiểm tra lại!"
         )
 
     email = session["email"]
@@ -163,14 +102,6 @@ async def verify_2fa(
     access_token = security.create_access_token(
         data={"sub": email, "role": role},
         expires_delta=access_token_expires
-    )
-
-    # Báo đăng nhập thành công về Telegram
-    await send_telegram_alert(
-        f"✅ <b>ĐĂNG NHẬP WEB TẠO KEY THÀNH CÔNG:</b>\n"
-        f"Admin: <code>{email}</code>\n"
-        f"IP: <code>{client_ip}</code>\n"
-        f"Thời gian: <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>"
     )
 
     return {

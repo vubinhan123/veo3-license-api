@@ -84,23 +84,21 @@ async def run_security_tests():
         
         if login_data.get("require_2fa"):
             session_id = login_data.get("session_id")
-            from app.api.auth import pending_2fa
-            saved_otp = pending_2fa[session_id]["otp"]
             
-            # Thử nhập mã OTP sai
+            # Thử nhập mã PIN sai
             bad_otp_res = await client.post("/api/v1/auth/verify-2fa", json={
                 "session_id": session_id,
                 "otp": "000000"
             })
-            check("Chặn Nhập Mã OTP 2FA Sai", bad_otp_res.status_code == 400, f"HTTP {bad_otp_res.status_code}")
+            check("Chặn Nhập Mã Khóa Cấp 2 Sai", bad_otp_res.status_code == 400, f"HTTP {bad_otp_res.status_code}")
             
-            # Nhập mã OTP đúng từ Telegram
+            # Nhập mã Master Security PIN đúng (336999)
             good_otp_res = await client.post("/api/v1/auth/verify-2fa", json={
                 "session_id": session_id,
-                "otp": saved_otp
+                "otp": settings.ADMIN_SECURITY_PIN
             })
             step2_ok = good_otp_res.status_code == 200 and "access_token" in good_otp_res.json()
-            check("Bước 2: Xác Thực Mã OTP 2FA Telegram Thành Công", step2_ok, f"HTTP {good_otp_res.status_code}")
+            check("Bước 2: Xác Thực Mã Khóa Cấp 2 (Master PIN) Thành Công", step2_ok, f"HTTP {good_otp_res.status_code}")
             admin_token = good_otp_res.json().get("access_token")
         else:
             admin_token = login_data.get("access_token")

@@ -149,4 +149,4 @@ app.include_router(telegram.router, prefix=f"{settings.API_V1_STR}/telegram", ta
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to VEO3 License Management API", "status": "online", "telegram_bot": "@tool_tu_dong_bot"}
+    return {"message": "Welcome to VEO3 License Management API", "status": "online"}

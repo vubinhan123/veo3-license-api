@@ -30,11 +30,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
     RATE_LIMIT_VERIFY_PER_MINUTE: int = 30
     RATE_LIMIT_HEARTBEAT_PER_MINUTE: int = 60
-
-    # 2FA & Telegram Security Alert
-    ENABLE_2FA_TELEGRAM: bool = True
-    TELEGRAM_BOT_TOKEN: str = "8957341354:AAHA6bLk-Z3_WH6RaRRszijmymQQYoGbxvM"
-    TELEGRAM_ADMIN_CHAT_ID: int = 7956637890
     
     class Config:
         case_sensitive = True
