@@ -156,7 +156,7 @@ class AntiCrackLicenseManager:
                 # Nếu không giải mã được bằng Public Key -> Token bị hacker giả mạo!
                 return False, f"Chữ ký số máy chủ không hợp lệ (Phát hiện can thiệp mạng/Fake Server): {jwt_err}"
 
-            # Kiểm tra Nonce trong Token có khớp với Nonce vừa gửi đi không
+            # Kiểm tra Nonce trong Token có khớp với Nonce vừa sinh ra không
             token_nonce = decoded.get("nonce")
             if token_nonce and token_nonce != session_nonce:
                 return False, "Cảnh báo bảo mật: Token không khớp phiên gửi (Phát hiện Replay Attack)!"
@@ -170,6 +170,12 @@ class AntiCrackLicenseManager:
             if token_tool not in [TOOL_TYPE, "combo_all", "all", "key_test"]:
                 return False, f"Key bản quyền này không áp dụng cho ứng dụng {TOOL_TYPE}!"
 
+            # ------------------------------------------------------------------
+            # BẢO VỆ 3: PHÁT HIỆN CÔNG CỤ DEBUG / DISASSEMBLER (ANTI-DEBUGGING)
+            # ------------------------------------------------------------------
+            if self._detect_debugger():
+                return False, "Cảnh báo an ninh: Phát hiện công cụ Reverse Engineering (Debugger) đang chạy!"
+
             self.is_licensed = True
             self.license_token = token
             self.verified_payload = decoded
@@ -181,6 +187,34 @@ class AntiCrackLicenseManager:
 
         except requests.exceptions.RequestException as net_err:
             return False, f"Không thể kết nối đến máy chủ xác thực: {net_err}"
+
+    @staticmethod
+    def _detect_debugger() -> bool:
+        """Kiểm tra xem ứng dụng có đang bị gắn cờ Debug (x64dbg, IDA Pro, Cheat Engine) hay không"""
+        try:
+            import ctypes
+            # Gọi hàm native Windows API IsDebuggerPresent
+            if ctypes.windll.kernel32.IsDebuggerPresent():
+                return True
+            # Kiểm tra CheckRemoteDebuggerPresent
+            is_remote = ctypes.c_bool(False)
+            ctypes.windll.kernel32.CheckRemoteDebuggerPresent(ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(is_remote))
+            if is_remote.value:
+                return True
+        except Exception:
+            pass
+        return False
+
+    def get_security_payload(self) -> dict:
+        """
+        Kỹ thuật Bảo Vệ Đa Điểm (Decentralized Protection):
+        Các chức năng quan trọng của Tool (Render, AI, Tải video) PHẢI lấy dữ liệu từ hàm này.
+        Nếu kẻ gian sửa code 'is_licensed = True' mà không có token RSA hợp lệ,
+        các tính năng cốt lõi sẽ trả về None hoặc tự động dừng, khiến bản crack trở nên vô dụng!
+        """
+        if not self.is_licensed or not self.verified_payload:
+            return {}
+        return self.verified_payload
 
     def _start_heartbeat_worker(self):
         """Khởi động luồng chạy ngầm gửi Heartbeat kiểm tra định kỳ 120s"""
