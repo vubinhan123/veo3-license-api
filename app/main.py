@@ -64,7 +64,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=None,        # Ẩn hoàn toàn Swagger UI chống quét cổng
+    redoc_url=None,       # Ẩn hoàn toàn ReDoc tài liệu API
+    openapi_url=None,     # Vô hiệu hóa OpenAPI Schema chống rò rỉ cấu trúc hệ thống
     lifespan=lifespan
 )
 
