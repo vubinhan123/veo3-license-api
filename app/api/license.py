@@ -30,7 +30,13 @@ async def get_dashboard_stats(
     expired_count = 0
     revoked_count = 0
     expiring_soon = 0
-    tool_dist = {}
+    tool_dist = {
+        "veo3_pro": 0,
+        "image_pro": 0,
+        "tool_voice": 0,
+        "ig_login": 0,
+        "combo_all": 0
+    }
     
     for l in licenses:
         tool_key = l.tool_type or "veo3_pro"
