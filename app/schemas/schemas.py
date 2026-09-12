@@ -88,6 +88,8 @@ class VerifyResponse(BaseModel):
     message: str
     tool_type: Optional[str] = None
     expiry: Optional[datetime] = None
+    plan_type: Optional[str] = None
+    is_permanent: Optional[bool] = False
     modules: Optional[dict] = {}
     nonce: Optional[str] = None
     server_timestamp: Optional[int] = None
@@ -100,5 +102,7 @@ class HeartbeatRequest(BaseModel):
 class HeartbeatResponse(BaseModel):
     status: str  # "active" | "revoked" | "expired" | "invalid"
     message: str
-    days_remaining: Optional[int] = 0
+    days_remaining: Optional[int] = None
+    plan_type: Optional[str] = None
+    is_permanent: Optional[bool] = False
     server_time: Optional[datetime] = None

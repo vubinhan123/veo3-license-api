@@ -251,7 +251,10 @@ async def create_batch_licenses(
     """Tao nhieu key cung luc (Batch Generator)"""
     import secrets
     created_list = []
-    exp_date = datetime.now(timezone.utc) + timedelta(days=data.expire_days)
+    if data.plan_type == "Permanent":
+        exp_date = datetime.now(timezone.utc) + timedelta(days=36500)
+    else:
+        exp_date = datetime.now(timezone.utc) + timedelta(days=data.expire_days)
     
     for i in range(data.count):
         raw = secrets.token_hex(16).upper()
@@ -364,21 +367,30 @@ async def license_heartbeat(request: schemas.HeartbeatRequest, db: AsyncSession 
         return schemas.HeartbeatResponse(status="revoked", message="License đã bị thu hồi bởi quản trị viên!", server_time=now)
         
     exp = db_license.expire_date
-    if exp.tzinfo is None:
+    if exp and exp.tzinfo is None:
         exp = exp.replace(tzinfo=timezone.utc)
         
-    diff = exp - now
-    days_left = max(0, diff.days)
-    if diff.total_seconds() <= 0:
-        return schemas.HeartbeatResponse(status="expired", message="License đã hết hạn!", days_remaining=0, server_time=now)
+    is_permanent = (db_license.plan_type == "Permanent") or (
+        exp and (exp.year >= 2099 or (exp - now).days >= 3650)
+    )
+
+    if is_permanent:
+        days_left = None
+    else:
+        diff = exp - now
+        days_left = max(0, diff.days)
+        if diff.total_seconds() <= 0:
+            return schemas.HeartbeatResponse(status="expired", message="License đã hết hạn!", days_remaining=0, server_time=now)
         
     db_license.last_heartbeat = now
     await db.commit()
     
     return schemas.HeartbeatResponse(
         status="active", 
-        message="OK", 
+        message="Bản quyền Vĩnh viễn (Không thời hạn)" if is_permanent else "OK", 
         days_remaining=days_left,
+        plan_type="Permanent" if is_permanent else db_license.plan_type,
+        is_permanent=is_permanent,
         server_time=now
     )
 
@@ -416,8 +428,13 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
         if db_license.status != "active":
             return VerifyResponse(status="fail", message="License đã bị vô hiệu hóa")
         
-        exp = db_license.expire_date.replace(tzinfo=None) if db_license.expire_date.tzinfo else db_license.expire_date
-        if exp < datetime.utcnow():
+        now_utc = datetime.utcnow()
+        exp_raw = db_license.expire_date.replace(tzinfo=None) if db_license.expire_date.tzinfo else db_license.expire_date
+        is_permanent = (db_license.plan_type == "Permanent") or (
+            exp_raw and (exp_raw.year >= 2099 or (exp_raw - now_utc).days >= 3650)
+        )
+
+        if not is_permanent and exp_raw < now_utc:
             return VerifyResponse(status="fail", message="License đã hết hạn")
         
         # 3. Kiểm tra phân quyền Tool (Tool Isolation)
@@ -484,8 +501,10 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
                 "license_key": db_license.license_key,
                 "hwid": request.hwid,
                 "tool_type": db_license.tool_type,
+                "plan_type": "Permanent" if is_permanent else db_license.plan_type,
+                "is_permanent": is_permanent,
                 "modules": db_license.enabled_modules,
-                "expiry": db_license.expire_date.isoformat(),
+                "expiry": None if is_permanent else db_license.expire_date.isoformat(),
                 "nonce": request.nonce,
                 "timestamp": server_now
             }
@@ -494,12 +513,15 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
             print("Sign token error:", sig_err)
             return VerifyResponse(status="fail", message="Lỗi bảo mật: Không thể tạo chữ ký số xác thực")
         
+        success_msg = "Xác thực thành công! Bản quyền VĨNH VIỄN (Không thời hạn)" if is_permanent else "Xác thực thành công"
         return VerifyResponse(
             status="success",
             token=token,
-            message="Xác thực thành công",
+            message=success_msg,
             tool_type=db_license.tool_type,
-            expiry=db_license.expire_date,
+            expiry=None if is_permanent else db_license.expire_date,
+            plan_type="Permanent" if is_permanent else db_license.plan_type,
+            is_permanent=is_permanent,
             modules=db_license.enabled_modules,
             nonce=request.nonce,
             server_timestamp=server_now
