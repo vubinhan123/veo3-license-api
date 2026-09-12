@@ -24,7 +24,7 @@ class License(Base):
     expire_date = Column(DateTime(timezone=True), nullable=False)
     max_devices = Column(Integer, default=1)
     status = Column(String, default="active")
-    tool_type = Column(String, default="veo3_pro", index=True)  # veo3_pro, image_pro, tool_voice, combo_all
+    tool_type = Column(String, default="veo3_pro", index=True)  # veo3_pro, image_pro, tool_voice, ig_login, combo_all
     hwid = Column(String, nullable=True)  # HWID cua may dau tien kich hoat
     reset_count = Column(Integer, default=0)  # So lan da reset HWID
     last_heartbeat = Column(DateTime(timezone=True), nullable=True)  # Thoi diem ping gan nhat

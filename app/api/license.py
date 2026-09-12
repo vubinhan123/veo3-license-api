@@ -96,12 +96,14 @@ async def get_dashboard_stats(
         "veo3_pro": "VEO3 PRO",
         "image_pro": "IMAGE PRO",
         "tool_voice": "TOOL VOICE",
+        "ig_login": "IG LOGIN",
         "combo_all": "KEY TEST"
     }
     tool_colors = {
         "veo3_pro": "#3b82f6",
         "image_pro": "#a855f7",
         "tool_voice": "#10b981",
+        "ig_login": "#ec4899",
         "combo_all": "#f59e0b"
     }
     tool_data = [
@@ -422,6 +424,7 @@ async def verify_license(request: VerifyRequest, db: AsyncSession = Depends(get_
                 "veo3_pro": "VEO3 PRO",
                 "image_pro": "IMAGE PRO",
                 "tool_voice": "TOOL VOICE",
+                "ig_login": "IG LOGIN",
                 "combo_all": "KEY TEST (TẤT CẢ TOOL)",
                 "key_test": "KEY TEST (TẤT CẢ TOOL)"
             }

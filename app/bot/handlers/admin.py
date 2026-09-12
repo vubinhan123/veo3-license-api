@@ -96,7 +96,7 @@ async def admin_set_price(message: Message):
             "⚠️ <b>Cú pháp đổi giá:</b>\n"
             "<code>/setgia [tool] [goi] [gia_tien]</code>\n\n"
             "Ví dụ: <code>/setgia veo3_pro 1m 250000</code>\n"
-            "Tools: <code>veo3_pro</code>, <code>image_pro</code>, <code>tool_voice</code>, <code>combo_2</code>, <code>combo_all</code>\n"
+            "Tools: <code>veo3_pro</code>, <code>image_pro</code>, <code>tool_voice</code>, <code>ig_login</code>, <code>combo_2</code>, <code>combo_all</code>\n"
             "Gói: <code>1m</code>, <code>3m</code>, <code>1y</code>, <code>life</code>",
             parse_mode="HTML"
         )
